@@ -82,15 +82,3 @@ docker run -d --name nezha \
 
 ---
 
-## 构建自己的镜像
-
-```bash
-git clone https://github.com/你的用户名/Nezha_ttyd.git
-cd Nezha_ttyd
-
-docker build -t nezha-ttyd .
-
-# 或推送到 GitHub Packages
-docker tag nezha-ttyd ghcr.io/你的用户名/nezha-ttyd:latest
-docker push ghcr.io/你的用户名/nezha-ttyd:latest
-```
