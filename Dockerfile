@@ -9,7 +9,7 @@ RUN apk add --no-cache curl
 
 # ttyd
 RUN curl -SL \
-    https://github.com/tsl0922/ttyd/releases/latest/download/ttyd-x86_64 \
+    https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64 \
     -o /usr/local/bin/ttyd && chmod +x /usr/local/bin/ttyd
 
 # cloudflared
