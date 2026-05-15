@@ -1,84 +1,122 @@
 # Nezha_ttyd
 
-All-in-one Docker image: **Nezha Dashboard v2 + Nginx(gRPC) + Cloudflare Tunnel + TTYD**  
-一键部署，一个容器跑通哪吒监控，零端口暴露，带网页终端。
+这是一个高度精简且全能的 Docker 镜像：**Nezha Dashboard v2 + 网页终端（TTYD）**。
+一键部署，一个容器跑通哪吒监控，带网页终端。
+
+> **探针监控说明**：
+> 为了保证容器在各大 PaaS 平台上的极致兼容性，本镜像**仅包含面板**。如需监控服务器：
+> 1. **真实的 VPS / 虚拟机**：请直接使用官方后台复制的原始命令（`curl -L ... install.sh`）在宿主机运行，依赖 `systemd` 最稳定。
+> 2. **PaaS 平台 / 纯容器环境**：由于没有 `systemd`，官方脚本会报错。请将原始命令粘贴到 [Argosbx 转换面板](https://zv201413.github.io/argosbx-new/)，一键生成免 systemd 的 `nohup` 容器专用命令后再执行。
 
 ---
 
-## 架构
+## 🚀 推荐部署方案：Northflank（最简单，自带 SSL）
 
-```
-Agent → Cloudflare(443) → Tunnel → cloudflared → nginx:80(grpc_pass) → dashboard:8008
-                                                      └─ ttyd:7681 / ttyd:7682 ...
-```
+Northflank 会自动为应用分配带 HTTPS 的专属域名。**不需要配置 Tunnel，也不需要搞证书**，这是最推荐的部署方式。
 
-一条 Cloudflare Tunnel 复用多个域名，各自映射到不同服务。
+### 1. 创建应用 (Service)
+
+在 Northflank 创建一个 Service，选择 Docker image 模式，并按以下参数配置：
+
+| 设置项 | 填写内容 |
+|--------|--------|
+| **镜像地址** | `ghcr.io/zv201413/nezha_ttyd:latest` |
+| **端口 1 (Port)** | `80` (用于访问哪吒面板及 gRPC 通信) |
+| **端口 2 (Port)** | `7681` (如果需要用到 TTYD 网页终端) |
+| **持久化存储 (Volume)** | 挂载路径填 `/opt/nezha/data`（必填，否则重启数据全丢） |
+
+**环境变量 (Variables)**：
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `NZ_AGENT_KEY` | ❌ | 固定面板 Agent 通信密钥，防止重启后密钥变更 |
+| `TTYD_P1` | ❌ | 网页终端，格式 `7681:admin:你的密码` |
+
+### 2. 访问面板
+
+部署成功后，查看 Northflank 分配的域名：
+- **哪吒面板**：`https://xxx.northflank.app`
+- **TTYD 终端**：`https://xxx.northflank.app:7681`
+
+> 首次登录哪吒面板后台，路径为 `/dashboard`，默认账号密码为 `admin / admin`，请立即修改！
 
 ---
 
-## 环境变量
+## ☁️ 其他 PaaS 平台（如 爪云, Zeabur 等）
 
-| 变量 | 必填 | 说明 |
-|------|------|------|
-| `TUNNEL_TOKEN` | ✅ | Cloudflare Tunnel Token |
-| `NZ_AGENT_KEY` | ❌ | 固定面板 `agent_secret_key`，防止重启后密钥变更 |
-| `TTYD_P1` | ❌ | TTYD 实例1，格式 `端口:用户名:密码` |
-| `TTYD_P2` | ❌ | TTYD 实例2（可继续拓展 P3、P4...） |
+如果平台不自动提供 SSL 域名，推荐使用 **Cloudflare Tunnel** 进行内网穿透。
 
-### 示例
+### 平台配置
 
-```bash
-TUNNEL_TOKEN=eyJhIjoi...
-NZ_AGENT_KEY=MyFixedKey123
-TTYD_P1=7681:admin:pass123
-TTYD_P2=7682:root:pass456
-```
+| 设置项 | 填写内容 |
+|--------|--------|
+| **镜像地址** | `ghcr.io/zv201413/nezha_ttyd:latest` |
+| **持久化目录** | 挂载到 `/opt/nezha/data` |
+| **环境变量** | `TUNNEL_TOKEN=eyJh...` (你的 Cloudflare Tunnel Token)<br>`NZ_AGENT_KEY=MyFixedKey123`<br>`TTYD_P1=7681:admin:密码` |
+
+### Cloudflare Zero Trust 配置
+在 Cloudflare Public Hostname 添加规则：
+- `nezha.你的域名.com` → 指向 `http://localhost:80`
+- `ttyd.你的域名.com` → 指向 `http://localhost:7681`
 
 ---
 
-## 部署
-
-### PaaS 平台（爪云 / justrunmy.app 等）
-
-填以下信息部署：
-
-```
-容器镜像: ghcr.io/你的用户名/nezha-ttyd:latest  （或 Docker Hub 地址）
-端口: 80
-环境变量: 按上表填写
-```
-
-### 自建服务器
+## 💻 自建服务器部署 (Docker)
 
 ```bash
 docker run -d --name nezha \
-  -p 80:80 \
+  --restart unless-stopped \
+  -p 8008:80 \
+  -p 7681:7681 \
   -v /opt/nezha/data:/opt/nezha/data \
-  -e TUNNEL_TOKEN=eyJhIjoi... \
   -e NZ_AGENT_KEY=MyFixedKey123 \
-  -e TTYD_P1=7681:admin:pass123 \
-  ghcr.io/你的用户名/nezha-ttyd:latest
+  -e TTYD_P1=7681:admin:你的终端密码 \
+  ghcr.io/zv201413/nezha_ttyd:latest
 ```
 
 ---
 
-## Cloudflare Zero Trust 配置
+## 🛠 高级设置：多个 TTYD 终端
 
-隧道创建好后，在 **Public Hostname** 添加规则：
-
-| 域名 | 服务 |
-|------|------|
-| `nezha.你的域名.com` | `localhost:80` |
-| `ttyd1.你的域名.com` | `localhost:7681` |
-| `ttyd2.你的域名.com` | `localhost:7682` |
-
-> 所有服务走同一条隧道（同一个 TUNNEL_TOKEN），通过不同域名访问不同服务。
+如果需要开多个终端供不同用户使用：
+```bash
+TTYD_P1=7681:admin:密码1
+TTYD_P2=7682:user2:密码2
+```
+*注意：记得在部署平台或 Cloudflare Tunnel 中放行对应的端口号。*
 
 ---
 
-## 哪吒面板后台
+## 🗑️ 探针卸载指南
 
-路径 `/dashboard`，首次登录 `admin / admin`，立即修改密码。
+如果你按照本说明在宿主机或容器中安装了探针（Komari/Nezha Agent），请根据你的**安装方式**选择卸载步骤：
 
----
+### 场景一：真实 VPS（使用官方 `.sh` 脚本安装的）
+官方脚本会自动把探针塞进系统服务里（systemd）并安装到 `/opt` 目录。在当前目录执行 `rm` 是没用的！
 
+**彻底卸载步骤**：
+```bash
+# 1. 停止并禁用服务
+sudo systemctl stop nezha-agent
+sudo systemctl disable nezha-agent
+
+# 2. 删除服务配置文件并刷新
+sudo rm /etc/systemd/system/nezha-agent.service
+sudo systemctl daemon-reload
+
+# 3. 删除探针老巢（极其重要）
+sudo rm -rf /opt/nezha
+```
+*(注：对于哪吒探针，你也可以在原机重新运行一次官方安装命令，然后在弹出的交互菜单里选择 `卸载 Agent`)*
+
+### 场景二：纯容器环境 / PaaS（使用 Argosbx 生成的 `nohup` 裸跑命令）
+使用面板转换出来的指令，属于“绿色免安装”模式，没有系统服务残留。
+
+**彻底卸载步骤**：
+```bash
+# 1. 猎杀后台驻留的进程
+pkill -f nezha-agent
+
+# 2. 直接删掉当前目录下下载的二进制文件及日志
+rm -f nezha-agent agent.log
+```
