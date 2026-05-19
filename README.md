@@ -3,11 +3,6 @@
 这是一个高度精简且全能的 Docker 镜像：**Nezha Dashboard v2 + 网页终端（TTYD）**。
 一键部署，一个容器跑通哪吒监控，带网页终端。
 
-> **探针监控说明**：
-> 为了保证容器在各大 PaaS 平台上的极致兼容性，本镜像**仅包含面板**。如需监控服务器：
-> 1. **真实的 VPS / 虚拟机**：请直接使用官方后台复制的原始命令（`curl -L ... install.sh`）在宿主机运行，依赖 `systemd` 最稳定。
-> 2. **PaaS 平台 / 纯容器环境**：由于没有 `systemd`，官方脚本会报错。请将原始命令粘贴到 [Argosbx 转换面板](https://zv201413.github.io/argosbx-new/)，一键生成免 systemd 的 `nohup` 容器专用命令后再执行。
-
 ---
 
 ## 🚀 推荐部署方案：Northflank（最简单，自带 SSL）
